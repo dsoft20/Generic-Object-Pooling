@@ -6,7 +6,7 @@ using UnityEngine;
 public class ObjectPooler : MonoBehaviour
 {
     [Header("Pool Settings")]
-    public GameObject objectToPool;    
+    public GameObject objectToPool;
     public string poolName = "";
     public int startPoolSize = 0;
     public bool autoGrow = false;
@@ -73,6 +73,7 @@ public class ObjectPooler : MonoBehaviour
         if (components.Count == 0)
         {
             Debug.LogWarning($"[POOLER] Does not have components of type {componentClassType}");
+            return null;
         }
 
         for (int i = 0; i < objects.Count; i++)
@@ -84,7 +85,13 @@ public class ObjectPooler : MonoBehaviour
             }
         }
 
-        return null;
+        if (autoGrow == false)
+        {
+            return null;
+        }
+
+        AddObjectToPool(true);
+        return components[components.Count - 1];
     }
 
     public int CountPooledObjects()
@@ -110,7 +117,7 @@ public class ObjectPooler : MonoBehaviour
 
     private void SetType()
     {
-        if (type!=null)
+        if (type != null)
         {
             return;
         }
