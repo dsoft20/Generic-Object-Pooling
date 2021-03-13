@@ -10,20 +10,32 @@ public class ObjectPooler : MonoBehaviour
     public string poolName = "";
     public int startPoolSize = 0;
     public bool autoGrow = false;
+    public int ActiveCount { private set; get; }
     [Header("Component")]
     public string componentClassType = "";
 
     private Type type;
     private List<GameObject> objects = new List<GameObject>();
     private List<Component> components = new List<Component>();
+    private GameObject poolingManagerReference = null;
 
-    private void Start()
+    #region Pooling manager
+    private static Dictionary<string, ObjectPooler> poolers = new Dictionary<string, ObjectPooler>();
+    #endregion
+
+    private void Awake()
     {
         Init();
     }
 
+    private void Start()
+    {
+
+    }
+
     public void Init()
     {
+        CreatePoolingManager();
         if (objectToPool == null)
         {
             Debug.LogWarning($"[POOLER] No object to pool has been provided.");
@@ -35,6 +47,20 @@ public class ObjectPooler : MonoBehaviour
         for (int i = 0; i < startPoolSize; i++)
         {
             AddObjectToPool();
+        }
+
+        poolers.Add(poolName, this);
+    }
+
+    private void Update()
+    {
+        ActiveCount = 0;
+        for (int i = 0; i < objects.Count; i++)
+        {
+            if (objects[i].activeInHierarchy)
+            {
+                ActiveCount++;
+            }
         }
     }
 
@@ -103,6 +129,8 @@ public class ObjectPooler : MonoBehaviour
     {
         GameObject temp = Instantiate(objectToPool);
         temp.SetActive(setActive);
+        temp.transform.SetParent(poolingManagerReference.transform);
+        temp.transform.localPosition = Vector3.zero;
         objects.Add(temp);
         PopulateComponentPool(temp);
         return objects[objects.Count - 1];
@@ -131,4 +159,71 @@ public class ObjectPooler : MonoBehaviour
             type = Type.GetType(componentClassType);
         }
     }
+
+    private void CreatePoolingManager()
+    {
+        GameObject existingPoolingManager = GameObject.FindGameObjectWithTag("PoolingManager");
+
+        if (existingPoolingManager != null)
+        {
+            poolingManagerReference = existingPoolingManager;
+            return;
+        }
+
+        GameObject poolingManager = new GameObject("PoolingManager");
+        poolingManager.tag = "PoolingManager";
+        poolingManager.transform.position = Vector3.down * 1000;
+
+        poolingManagerReference = poolingManager;
+    }
+
+    #region Static methods for object poolers management
+    public static ObjectPooler GetObjectPoolerByPoolName(string poolName)
+    {
+        ObjectPooler[] poolers = GameObject.FindObjectsOfType<ObjectPooler>() as ObjectPooler[];
+
+        for (int i = 0; i < poolers.Length; i++)
+        {
+            if (poolers[i].poolName == poolName)
+            {
+                return poolers[i];
+            }
+        }
+
+        return null;
+    }
+
+    public static GameObject SpawnObject(string poolerName)
+    {
+        if (!poolers.ContainsKey(poolerName))
+        {
+            Debug.LogError($"[POOLER] Cannot use SpawnComponent() no ObjectPooler named {poolerName} found!");
+            return null;
+        }
+
+        return poolers[poolerName].SpawnObject();
+    }
+
+    public static T SpawnObject<T>(string poolerName) where T : Component
+    {
+        if (!poolers.ContainsKey(poolerName))
+        {
+            Debug.LogError($"[POOLER] Cannot use SpawnComponent() no ObjectPooler named {poolerName} found!");
+            return null;
+        }
+
+        return SpawnObject(poolerName).GetComponent<T>();
+    }
+
+    public Component SpawnComponent(string poolerName)
+    {
+        if (!poolers.ContainsKey(poolerName))
+        {
+            Debug.LogError($"[POOLER] Cannot use SpawnComponent() no ObjectPooler named {poolerName} found!");
+            return null;
+        }
+
+        return poolers[poolerName].SpawnComponent();
+    }
+    #endregion
 }
